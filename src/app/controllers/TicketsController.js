@@ -1,5 +1,4 @@
 const Tickets = require('../models/Tickets');
-const checkUserHasPermission = require('../utils/checkUserHasPermission');
 
 class TicketController {
   constructor() {
