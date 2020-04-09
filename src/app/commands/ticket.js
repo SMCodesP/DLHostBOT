@@ -1,5 +1,4 @@
 const Discord = require('discord.js');
-const checkUserHasPermission = require('../utils/checkUserHasPermission');
 const TicketsController = require('../controllers/TicketsController');
 const Tickets = require('../models/Tickets');
 
@@ -47,7 +46,6 @@ class Ticket {
           .addField(`**\n**`, `**\n**`)
           .setTimestamp()
           .setFooter(msg.author.tag, bot.user.avatarURL);
-        const tickets = await TicketsController.index();
         msg.channel.send(embed);
       },
       criar: async (bot, msg, args, prefix) => {
@@ -59,7 +57,7 @@ class Ticket {
           );
 
         const date = new Date();
-        const request = await TicketsController.store({
+        TicketsController.store({
           body: {
             msg,
             date: {
@@ -68,54 +66,39 @@ class Ticket {
               day: date.getDate(),
             },
           },
-        });
-
-        if (request.error) return msg.reply(request.result);
-        msg.reply(request.result);
+        })
+          .then((result) => {
+            msg.reply(result);
+          })
+          .catch((err) => {
+            msg.reply(err);
+          });
         return true;
       },
-      deletar: async (bot, msg, args, prefix) => {
+      deletar: async (bot, msg, args) => {
+        let deleted = msg.member;
         if (args[1]) {
-          if (!checkUserHasPermission('MANAGE_MESSAGES', msg.member))
+          if (!msg.member.hasPermission('MANAGE_MESSAGES'))
             return msg.reply(
               `Você não tem permissão para excluir tickets de outros usuários.`
             );
-          const user =
+          deleted =
             msg.mentions.members.first() || msg.guild.members.get(args[1]);
-
-          try {
-            await TicketsController.delete({
-              body: {
-                user_id: user.user.id,
-                bot,
-              },
-            });
-            return true;
-          } catch (err) {
-            return false;
-          }
         }
-        const ticket = await Tickets.findOne({ user_id: msg.author.id });
-        if (!ticket)
-          return msg.reply(
-            `Você não tem um ticket registrado em nosso sistema de \`${prefix}ticket criar\`.`
-          );
-        const canal = bot.channels.get(ticket.channel_id);
         try {
-          await Tickets.findOneAndDelete({ user_id: msg.author.id });
-          await canal.delete().catch(() => {});
-          msg.reply(
-            `Você deletou seu ticket caso queira criar outro digite \`${prefix}ticket criar\`.`
-          );
-
-          return true;
+          const ticket = await TicketsController.delete({
+            body: {
+              user_id: deleted.user.id,
+              bot,
+              user: deleted,
+            },
+          });
+          msg.reply(ticket);
         } catch (err) {
-          msg.reply(
-            'Houve um erro na requisição de delete de um ticket, tente novamente mais tarde.'
-          );
-          return false;
+          msg.reply(err);
         }
-        // bot.channels.get('697601749040758834').delete().catch(O_o=>{});
+
+        return null;
       },
     };
   }

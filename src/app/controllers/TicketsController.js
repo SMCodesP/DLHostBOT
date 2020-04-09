@@ -1,96 +1,115 @@
 const Tickets = require('../models/Tickets');
+const checkUserHasPermission = require('../utils/checkUserHasPermission');
 
 class TicketController {
-  index(req) {
-    return new Promise((res, rej) => {
-      const { user_id } = req.body;
+  constructor() {
+    this.index = (req) => {
+      return new Promise((res, rej) => {
+        const { user_id } = req.body;
 
-      const ticket = Tickets.findOne({ user_id }, (err, result) => {
-        if (err)
-          return rej(
-            new Error(
-              'Houve um erro em nosso sistema,tente novamente mais tarde.'
-            )
-          );
-        if (!ticket) return rej(new Error('Ticket não encontrado.'));
-        return res(result);
+        Tickets.findOne({ user_id })
+          .then((response) => {
+            res(response);
+          })
+          .catch((err) => {
+            rej(err);
+          });
       });
-    });
+    };
+
+    this.store = (req) => {
+      return new Promise((res, rej) => {
+        const { msg, date } = req.body;
+        const positions = [];
+        msg.guild.members.cache.map((user) => {
+          if (checkUserHasPermission('MANAGE_MESSAGES', user))
+            return positions.push({
+              id: user.user.id,
+              allow: ['READ_MESSAGES'],
+            });
+          return false;
+        });
+        msg.guild.channels
+          .create(`ticket-${msg.author.id}`, 'text', [
+            ...positions,
+            {
+              id: msg.author.id,
+              allow: ['READ_MESSAGES'],
+            },
+            {
+              id: msg.guild.id,
+              deny: ['READ_MESSAGES'],
+            },
+          ])
+          .then((channel) => {
+            Tickets.create({
+              user_id: msg.author.id,
+              name_channel: `ticket-${msg.author.id}`,
+              channel_id: channel.id,
+              date,
+            })
+              .then(() => {
+                return res(
+                  `Seu ticket foi criado clique aqui para acessa-lo: ${channel}`
+                );
+              })
+              .catch(() => {
+                channel.delete().catch(() => {});
+                return rej(
+                  new Error(
+                    'Houve um erro na requisição de criação de um ticket, tente novamente mais tarde.'
+                  )
+                );
+              });
+          })
+          .catch(() => {
+            rej(
+              new Error(
+                'Houve um erro na requisição de criação de um ticket, tente novamente mais tarde.'
+              )
+            );
+          });
+      });
+    };
+
+    this.delete = (req) => {
+      return new Promise((res, rej) => {
+        const { user_id, bot, user } = req.body;
+        const sucess = `O ticket de ${user} foi deletado com sucesso!`;
+        this.verifyExists(user_id).then((result) => {
+          if (!result.state)
+            return rej(new Error(`${user} não possui um ticket.`));
+          this.eliminate(user_id, bot, result.data).then((response) => {
+            if (!response)
+              return rej(
+                new Error(`Não foi possível deletar o ticket de ${user}`)
+              );
+
+            return res(sucess);
+          });
+          return res(sucess);
+        });
+      });
+    };
   }
 
-  // store(req) {
-  //   return new Promise(async (res, rej) => {
-  //     const { msg, date } = req.body;
-  //     try {
-  //       const ticket = await msg.guild.createChannel(
-  //         `ticket-${msg.author.id}`,
-  //         'text',
-  //         [
-  //           ...positions,
-  //           {
-  //             id: msg.author.id,
-  //             allow: ['READ_MESSAGES'],
-  //           },
-  //           {
-  //             id: msg.guild.id,
-  //             deny: ['READ_MESSAGES'],
-  //           },
-  //         ]
-  //       );
-  //       await Tickets.create({
-  //         user_id: msg.author.id,
-  //         name_channel: `ticket-${msg.author.id}`,
-  //         channel_id: ticket.id,
-  //         date,
-  //       });
-  //       return res(
-  //         `Você criou um ticket,para acessa-lo clique aqui: ${ticket}`
-  //       );
-  //     } catch (err) {
-  //       return rej(`Houve um erro na requisição de criação de um ticket,
-  //         tente novamente mais tarde.`);
-  //     }
-  //   });
-  // }
+  async verifyExists(user_id) {
+    const ticket = await Tickets.findOne({ user_id });
+    if (!ticket) return false;
+    return { state: true, data: ticket };
+  }
 
-  // delete(req) {
-  //   return new Promise(async (res, rej) => {
-  //     const { user_id, bot } = req.body;
-  //     try {
-  //       let ticket = await Tickets.findOne({ user_id });
-  //       try {
-  //         await Tickets.findOneAndDelete({ user_id });
+  async eliminate(user_id, bot, data) {
+    try {
+      await Tickets.findOneAndDelete({ user_id });
 
-  //         try {
-  //           const canal = bot.channels.fetch(ticket.channel_id);
-  //           ticket = await Tickets.findOneAndDelete({ user_id: user.user.id });
-  //           try {
-  //             await canal.delete();
-  //             msg.reply(`Você deletou o ticket de <@${user.user.id}>.`);
-
-  //             return res('Ticket excluído com sucesso!');
-  //           } catch (err) {
-  //             console.log(err);
-  //             return rej(`Houve um erro em nosso sistema,
-  //               tente novamente mais tarde.`);
-  //           }
-  //         } catch (err) {
-  //           console.log(err);
-  //           return rej(`Houve um erro em nosso sistema,
-  //             tente novamente mais tarde.`);
-  //         }
-  //       } catch (err) {
-  //         console.log(err);
-  //         return rej(`Houve um erro em nosso sistema,
-  //           tente novamente mais tarde.`);
-  //       }
-  //     } catch (err) {
-  //       console.log(err);
-  //       return rej(`Houve um erro em nosso sistema,
-  //         tente novamente mais tarde.`);
-  //     }
-  //   });
-  // }
+      const canal = await bot.channels.fetch(data.channel_id);
+      canal.delete();
+      return true;
+    } catch (err) {
+      return false;
+    }
+  }
 }
 
 module.exports = new TicketController();
