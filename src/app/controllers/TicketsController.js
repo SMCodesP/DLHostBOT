@@ -22,25 +22,30 @@ class TicketController {
         const { msg, date } = req.body;
         const positions = [];
         msg.guild.members.cache.map((user) => {
-          if (checkUserHasPermission('MANAGE_MESSAGES', user))
+          if (user.hasPermission('MANAGE_MESSAGES')) {
             return positions.push({
               id: user.user.id,
-              allow: ['READ_MESSAGES'],
+              allow: ['VIEW_CHANNEL'],
             });
+          }
           return false;
         });
         msg.guild.channels
-          .create(`ticket-${msg.author.id}`, 'text', [
-            ...positions,
-            {
-              id: msg.author.id,
-              allow: ['READ_MESSAGES'],
-            },
-            {
-              id: msg.guild.id,
-              deny: ['READ_MESSAGES'],
-            },
-          ])
+          .create(`ticket-${msg.author.id}`, {
+            type: 'text',
+            reason: 'New channel added for fun!',
+            permissionOverwrites: [
+              ...positions,
+              {
+                id: msg.guild.id,
+                deny: ['VIEW_CHANNEL'],
+              },
+              {
+                id: msg.member.id,
+                allow: ['VIEW_CHANNEL'],
+              },
+            ],
+          })
           .then((channel) => {
             Tickets.create({
               user_id: msg.author.id,
