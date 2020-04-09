@@ -1,0 +1,28 @@
+{
+  "name": "DLHostBOT",
+  "version": "1.0.0",
+  "main": "index.js",
+  "author": "SMCodesP <samuel.silva513@etec.sp.gov.br>",
+  "license": "MIT",
+  "dependencies": {
+    "discord.js": "^12.1.1",
+    "dotenv": "^8.2.0",
+    "express": "^4.16.4",
+    "fs": "^0.0.2",
+    "mongoose": "^5.7.12",
+    "register-cmd-discord": "^1.0.0"
+  },
+  "devDependencies": {
+    "eslint": "^6.8.0",
+    "eslint-config-airbnb-base": "^14.1.0",
+    "eslint-config-prettier": "^6.10.1",
+    "eslint-plugin-import": "^2.20.2",
+    "eslint-plugin-prettier": "^3.1.2",
+    "nodemon": "^2.0.3",
+    "prettier": "^2.0.4"
+  },
+  "scripts": {
+    "dev": "nodemon src/server.js",
+    "start": "node src/server.js"
+  }
+}
